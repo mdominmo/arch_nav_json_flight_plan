@@ -1,8 +1,8 @@
 <?xml version="1.0"?>
 <package format="3">
-  <name>arch_nav_flight_plan</name>
+  <name>arch_nav_mission_file</name>
   <version>0.0.1</version>
-  <description>FlightPlan service interface module for the arch-nav navigation kernel</description>
+  <description>Mission file executor module for the arch-nav navigation kernel</description>
   <maintainer email="mandominguez97@gmail.com">Manuel Domínguez Montero</maintainer>
   <license>Apache-2.0</license>
 
@@ -12,10 +12,7 @@
   <depend>arch_nav_px4</depend>
   <depend>ament_index_cpp</depend>
   <depend>geographic_msgs</depend>
-  <depend>geometry_msgs</depend>
-  <depend>origami_interfaces</depend>
   <depend>rclcpp</depend>
-  <depend>std_srvs</depend>
 
   <export>
     <build_type>ament_cmake</build_type>
