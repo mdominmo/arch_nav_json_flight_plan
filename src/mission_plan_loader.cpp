@@ -18,19 +18,17 @@ MissionPlan MissionPlanLoader::load_from(const std::string& path)
 
   MissionPlan plan;
   plan.takeoff_height = json.at("takeoff").at("height").get<double>();
-  plan.land           = json.value("land", true);
+  plan.land = json.value("land", true);
 
   for (const auto& wp : json.at("waypoints")) {
-    geographic_msgs::msg::GeoPose pose;
-    pose.position.latitude  = wp.at("latitude").get<double>();
-    pose.position.longitude = wp.at("longitude").get<double>();
-    pose.position.altitude  = wp.at("altitude").get<double>();
-    // Orientation defaults to identity (heading north) unless specified
-    pose.orientation.w = wp.value("qw", 1.0);
-    pose.orientation.x = wp.value("qx", 0.0);
-    pose.orientation.y = wp.value("qy", 0.0);
-    pose.orientation.z = wp.value("qz", 0.0);
-    plan.waypoints.push_back(pose);
+    plan.waypoints.emplace_back(
+        wp.at("latitude").get<double>(),
+        wp.at("longitude").get<double>(),
+        wp.at("altitude").get<double>(),
+        wp.value("qx", 0.0),
+        wp.value("qy", 0.0),
+        wp.value("qz", 0.0),
+        wp.value("qw", 1.0));
   }
 
   return plan;

@@ -13,7 +13,7 @@ void MissionExecutor::start(const MissionPlan& plan)
 {
   plan_ = plan;
   step_ = Step::WAITING_ARM;
-  RCLCPP_INFO(node_.get_logger(), "Mission loaded — waiting for offboard + armed");
+  RCLCPP_INFO(node_.get_logger(), "Mission loaded - waiting for vehicle ready");
   timer_ = node_.create_wall_timer(
       std::chrono::milliseconds(100),
       [this]() { on_tick(); });
@@ -25,8 +25,16 @@ void MissionExecutor::on_tick()
 
   switch (step_) {
     case Step::WAITING_ARM:
-      if (status == OperationStatus::IDDLE) {
-        RCLCPP_INFO(node_.get_logger(), "Armed and in offboard — taking off to %.1fm", plan_.takeoff_height);
+      if (status == OperationStatus::DISARMED) {
+        RCLCPP_INFO(node_.get_logger(), "Vehicle connected - arming");
+        api_.arm();
+        step_ = Step::ARMING;
+      }
+      break;
+
+    case Step::ARMING:
+      if (status == OperationStatus::IDLE) {
+        RCLCPP_INFO(node_.get_logger(), "Armed - taking off to %.1fm", plan_.takeoff_height);
         api_.takeoff(plan_.takeoff_height);
         step_ = Step::TAKEOFF;
       }
@@ -43,8 +51,8 @@ void MissionExecutor::on_tick()
         RCLCPP_ERROR(node_.get_logger(), "Takeoff failed");
         timer_->cancel();
         step_ = Step::DONE;
-      } else if (status == OperationStatus::IDDLE) {
-        RCLCPP_INFO(node_.get_logger(), "Takeoff complete — starting waypoint following");
+      } else if (status == OperationStatus::IDLE) {
+        RCLCPP_INFO(node_.get_logger(), "Takeoff complete - starting waypoint following");
         api_.waypoint_following(plan_.waypoints);
         step_ = Step::WAYPOINTS;
       }
@@ -61,9 +69,9 @@ void MissionExecutor::on_tick()
         RCLCPP_ERROR(node_.get_logger(), "Waypoint following failed");
         timer_->cancel();
         step_ = Step::DONE;
-      } else if (status == OperationStatus::IDDLE) {
+      } else if (status == OperationStatus::IDLE) {
         if (plan_.land) {
-          RCLCPP_INFO(node_.get_logger(), "Waypoints complete — landing");
+          RCLCPP_INFO(node_.get_logger(), "Waypoints complete - landing");
           api_.land();
           step_ = Step::LAND;
         } else {
@@ -83,7 +91,7 @@ void MissionExecutor::on_tick()
     case Step::WAITING_LAND:
       if (status == OperationStatus::FAILED) {
         RCLCPP_ERROR(node_.get_logger(), "Landing failed");
-      } else if (status == OperationStatus::IDDLE) {
+      } else if (status == OperationStatus::IDLE) {
         RCLCPP_INFO(node_.get_logger(), "Mission complete");
       }
       timer_->cancel();

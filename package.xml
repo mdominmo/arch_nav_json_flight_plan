@@ -1,17 +1,13 @@
 <?xml version="1.0"?>
 <package format="3">
-  <name>arch_nav_mission_file</name>
+  <name>arch_nav_json_flight_plan</name>
   <version>0.0.1</version>
   <description>Mission file executor module for the arch-nav navigation kernel</description>
-  <maintainer email="mandominguez97@gmail.com">Manuel Domínguez Montero</maintainer>
+  <maintainer email="mandominguez97@gmail.com">Manuel Dominguez Montero</maintainer>
   <license>Apache-2.0</license>
 
   <buildtool_depend>ament_cmake</buildtool_depend>
 
-  <depend>arch-nav</depend>
-  <depend>arch_nav_px4</depend>
-  <depend>ament_index_cpp</depend>
-  <depend>geographic_msgs</depend>
   <depend>rclcpp</depend>
 
   <export>

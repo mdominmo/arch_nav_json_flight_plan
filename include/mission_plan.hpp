@@ -3,14 +3,14 @@
 
 #include <vector>
 
-#include "geographic_msgs/msg/geo_pose.hpp"
+#include "core/model/vehicle/geo_waypoint.hpp"
 
 namespace arch_nav_mission_file {
 
 struct MissionPlan {
-  double                                    takeoff_height;
-  std::vector<geographic_msgs::msg::GeoPose> waypoints;
-  bool                                      land{true};
+  double takeoff_height;
+  std::vector<arch_nav::vehicle::GeoWaypoint> waypoints;
+  bool land{true};
 };
 
 }  // namespace arch_nav_mission_file

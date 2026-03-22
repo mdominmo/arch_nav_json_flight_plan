@@ -15,7 +15,7 @@ class MissionExecutor {
   void start(const MissionPlan& plan);
 
  private:
-  enum class Step { WAITING_ARM, TAKEOFF, WAITING_TAKEOFF,
+  enum class Step { WAITING_ARM, ARMING, TAKEOFF, WAITING_TAKEOFF,
                     WAYPOINTS, WAITING_WAYPOINTS,
                     LAND, WAITING_LAND, DONE };
 
