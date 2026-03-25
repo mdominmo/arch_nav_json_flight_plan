@@ -24,11 +24,7 @@ MissionPlan MissionPlanLoader::load_from(const std::string& path)
     plan.waypoints.emplace_back(
         wp.at("latitude").get<double>(),
         wp.at("longitude").get<double>(),
-        wp.at("altitude").get<double>(),
-        wp.value("qx", 0.0),
-        wp.value("qy", 0.0),
-        wp.value("qz", 0.0),
-        wp.value("qw", 1.0));
+        wp.at("altitude").get<double>());
   }
 
   return plan;

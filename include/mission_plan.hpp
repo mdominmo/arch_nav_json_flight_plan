@@ -3,13 +3,13 @@
 
 #include <vector>
 
-#include "core/model/vehicle/geo_waypoint.hpp"
+#include "arch_nav/arch_nav_api.hpp"
 
 namespace arch_nav_mission_file {
 
 struct MissionPlan {
   double takeoff_height;
-  std::vector<arch_nav::vehicle::GeoWaypoint> waypoints;
+  std::vector<arch_nav::vehicle::Waypoint> waypoints;
   bool land{true};
 };
 

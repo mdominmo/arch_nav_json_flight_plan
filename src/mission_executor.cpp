@@ -1,10 +1,9 @@
 #include "mission_executor.hpp"
 
-#include "core/constants/operation_status.hpp"
-
 namespace arch_nav_mission_file {
 
 using arch_nav::constants::OperationStatus;
+using arch_nav::constants::ReferenceFrame;
 
 MissionExecutor::MissionExecutor(arch_nav::ArchNavApi& api, rclcpp::Node& node)
 : api_(api), node_(node) {}
@@ -53,7 +52,7 @@ void MissionExecutor::on_tick()
         step_ = Step::DONE;
       } else if (status == OperationStatus::IDLE) {
         RCLCPP_INFO(node_.get_logger(), "Takeoff complete - starting waypoint following");
-        api_.waypoint_following(plan_.waypoints);
+        api_.waypoint_following(plan_.waypoints, ReferenceFrame::GLOBAL_WGS84);
         step_ = Step::WAYPOINTS;
       }
       break;

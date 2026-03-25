@@ -3,7 +3,7 @@
 
 #include "rclcpp/rclcpp.hpp"
 
-#include "arch_nav_api.hpp"
+#include "arch_nav/arch_nav_api.hpp"
 #include "mission_plan.hpp"
 
 namespace arch_nav_mission_file {
