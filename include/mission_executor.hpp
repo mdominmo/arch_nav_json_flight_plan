@@ -15,11 +15,12 @@ class MissionExecutor {
   void start(const MissionPlan& plan);
 
  private:
-  enum class Step { WAITING_ARM, ARMING, TAKEOFF, WAITING_TAKEOFF,
-                    WAYPOINTS, WAITING_WAYPOINTS,
-                    LAND, WAITING_LAND, DONE };
+  enum class Step { WAITING_ARM, ARMING,
+                    WAITING_TAKEOFF, WAITING_WAYPOINTS, WAITING_LAND,
+                    DONE };
 
   void on_tick();
+  void abort_mission(const char* reason);
 
   arch_nav::ArchNavApi&   api_;
   rclcpp::Node&              node_;

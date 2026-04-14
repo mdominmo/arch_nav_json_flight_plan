@@ -2,8 +2,10 @@
 
 namespace arch_nav_mission_file {
 
+using arch_nav::constants::CommandResponse;
 using arch_nav::constants::OperationStatus;
 using arch_nav::constants::ReferenceFrame;
+using arch_nav::report::ReportStatus;
 
 MissionExecutor::MissionExecutor(arch_nav::ArchNavApi& api, rclcpp::Node& node)
 : api_(api), node_(node) {}
@@ -16,6 +18,13 @@ void MissionExecutor::start(const MissionPlan& plan)
   timer_ = node_.create_wall_timer(
       std::chrono::milliseconds(100),
       [this]() { on_tick(); });
+}
+
+void MissionExecutor::abort_mission(const char* reason)
+{
+  RCLCPP_ERROR(node_.get_logger(), "Mission aborted: %s", reason);
+  timer_->cancel();
+  step_ = Step::DONE;
 }
 
 void MissionExecutor::on_tick()
@@ -34,45 +43,46 @@ void MissionExecutor::on_tick()
     case Step::ARMING:
       if (status == OperationStatus::IDLE) {
         RCLCPP_INFO(node_.get_logger(), "Armed - taking off to %.1fm", plan_.takeoff_height);
-        api_.takeoff(plan_.takeoff_height);
-        step_ = Step::TAKEOFF;
-      }
-      break;
-
-    case Step::TAKEOFF:
-      if (status == OperationStatus::RUNNING) {
-        step_ = Step::WAITING_TAKEOFF;
+        if (api_.takeoff(plan_.takeoff_height) != CommandResponse::ACCEPTED) {
+          abort_mission("takeoff command rejected");
+        } else {
+          step_ = Step::WAITING_TAKEOFF;
+        }
       }
       break;
 
     case Step::WAITING_TAKEOFF:
-      if (status == OperationStatus::FAILED) {
-        RCLCPP_ERROR(node_.get_logger(), "Takeoff failed");
-        timer_->cancel();
-        step_ = Step::DONE;
+      if (status == OperationStatus::HANDOVER) {
+        abort_mission("vehicle lost control during takeoff");
       } else if (status == OperationStatus::IDLE) {
-        RCLCPP_INFO(node_.get_logger(), "Takeoff complete - starting waypoint following");
-        api_.waypoint_following(plan_.waypoints, ReferenceFrame::GLOBAL_WGS84);
-        step_ = Step::WAYPOINTS;
-      }
-      break;
-
-    case Step::WAYPOINTS:
-      if (status == OperationStatus::RUNNING) {
-        step_ = Step::WAITING_WAYPOINTS;
+        const auto* report = api_.last_operation_report();
+        if (report && report->status() == ReportStatus::ABORTED) {
+          abort_mission("takeoff aborted");
+        } else {
+          RCLCPP_INFO(node_.get_logger(), "Takeoff complete - starting waypoint following");
+          if (api_.waypoint_following(plan_.waypoints) != CommandResponse::ACCEPTED) {
+            abort_mission("waypoint following command rejected");
+          } else {
+            step_ = Step::WAITING_WAYPOINTS;
+          }
+        }
       }
       break;
 
     case Step::WAITING_WAYPOINTS:
-      if (status == OperationStatus::FAILED) {
-        RCLCPP_ERROR(node_.get_logger(), "Waypoint following failed");
-        timer_->cancel();
-        step_ = Step::DONE;
+      if (status == OperationStatus::HANDOVER) {
+        abort_mission("vehicle lost control during waypoint following");
       } else if (status == OperationStatus::IDLE) {
-        if (plan_.land) {
+        const auto* report = api_.last_operation_report();
+        if (report && report->status() == ReportStatus::ABORTED) {
+          abort_mission("waypoint following aborted");
+        } else if (plan_.land) {
           RCLCPP_INFO(node_.get_logger(), "Waypoints complete - landing");
-          api_.land();
-          step_ = Step::LAND;
+          if (api_.land() != CommandResponse::ACCEPTED) {
+            abort_mission("land command rejected");
+          } else {
+            step_ = Step::WAITING_LAND;
+          }
         } else {
           RCLCPP_INFO(node_.get_logger(), "Mission complete");
           timer_->cancel();
@@ -81,20 +91,19 @@ void MissionExecutor::on_tick()
       }
       break;
 
-    case Step::LAND:
-      if (status == OperationStatus::RUNNING) {
-        step_ = Step::WAITING_LAND;
-      }
-      break;
-
     case Step::WAITING_LAND:
-      if (status == OperationStatus::FAILED) {
-        RCLCPP_ERROR(node_.get_logger(), "Landing failed");
-      } else if (status == OperationStatus::IDLE) {
-        RCLCPP_INFO(node_.get_logger(), "Mission complete");
+      if (status == OperationStatus::HANDOVER) {
+        abort_mission("vehicle lost control during landing");
+      } else if (status == OperationStatus::IDLE || status == OperationStatus::DISARMED) {
+        const auto* report = api_.last_operation_report();
+        if (report && report->status() == ReportStatus::ABORTED) {
+          abort_mission("landing aborted");
+        } else {
+          RCLCPP_INFO(node_.get_logger(), "Mission complete");
+          timer_->cancel();
+          step_ = Step::DONE;
+        }
       }
-      timer_->cancel();
-      step_ = Step::DONE;
       break;
 
     case Step::DONE:
