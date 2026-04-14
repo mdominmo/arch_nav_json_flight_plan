@@ -20,6 +20,8 @@ class MissionExecutor {
                     DONE };
 
   void on_tick();
+  void on_operation_complete(const arch_nav::report::OperationReport& report);
+  void on_operation_progress(const arch_nav::report::OperationReport& report);
   void abort_mission(const char* reason);
 
   arch_nav::ArchNavApi&   api_;
