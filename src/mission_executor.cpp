@@ -1,5 +1,7 @@
 #include "mission_executor.hpp"
 
+#include <sstream>
+
 #include "arch_nav/model/report/takeoff_report.hpp"
 #include "arch_nav/model/report/waypoint_report.hpp"
 
@@ -10,6 +12,20 @@ using arch_nav::constants::OperationStatus;
 using arch_nav::constants::ReferenceFrame;
 using arch_nav::report::ReportStatus;
 
+namespace {
+
+const char* frame_to_cstr(ReferenceFrame frame) {
+  switch (frame) {
+    case ReferenceFrame::GLOBAL_WGS84: return "GLOBAL_WGS84";
+    case ReferenceFrame::LOCAL_NED: return "LOCAL_NED";
+    case ReferenceFrame::LOCAL_ENU: return "LOCAL_ENU";
+    case ReferenceFrame::BODY_FCS: return "BODY_FCS";
+    default: return "UNKNOWN";
+  }
+}
+
+}  // namespace
+
 MissionExecutor::MissionExecutor(arch_nav::ArchNavApi& api, rclcpp::Node& node)
 : api_(api), node_(node) {}
 
@@ -17,6 +33,7 @@ void MissionExecutor::start(const MissionPlan& plan)
 {
   plan_ = plan;
   step_ = Step::WAITING_ARM;
+  next_op_index_ = 0;
 
   api_.on_operation_complete([this](const arch_nav::report::OperationReport& report) {
     on_operation_complete(report);
@@ -26,17 +43,68 @@ void MissionExecutor::start(const MissionPlan& plan)
     on_operation_progress(report);
   });
 
-  RCLCPP_INFO(node_.get_logger(), "Mission loaded - waiting for vehicle ready");
+  RCLCPP_INFO(node_.get_logger(), "Mission loaded (%zu operations) - waiting for vehicle ready",
+      plan_.operations.size());
   timer_ = node_.create_wall_timer(
       std::chrono::milliseconds(100),
       [this]() { on_tick(); });
 }
 
-void MissionExecutor::abort_mission(const char* reason)
+void MissionExecutor::abort_mission(const std::string& reason)
 {
-  RCLCPP_ERROR(node_.get_logger(), "Mission aborted: %s", reason);
+  RCLCPP_ERROR(node_.get_logger(), "Mission aborted: %s", reason.c_str());
   if (timer_) timer_->cancel();
   step_ = Step::DONE;
+}
+
+bool MissionExecutor::start_next_operation()
+{
+  if (next_op_index_ >= plan_.operations.size()) {
+    RCLCPP_INFO(node_.get_logger(), "Mission complete");
+    if (timer_) timer_->cancel();
+    step_ = Step::DONE;
+    return true;
+  }
+
+  const auto& op = plan_.operations[next_op_index_];
+  CommandResponse response = CommandResponse::DENIED;
+
+  switch (op.type) {
+    case MissionOperation::Type::TAKEOFF:
+      RCLCPP_INFO(node_.get_logger(), "[op %zu/%zu] takeoff: height=%.2f m frame=%s",
+          next_op_index_ + 1, plan_.operations.size(), op.takeoff_height, frame_to_cstr(op.frame));
+      response = api_.takeoff(op.takeoff_height, op.frame);
+      break;
+
+    case MissionOperation::Type::CHANGE_YAW:
+      RCLCPP_INFO(node_.get_logger(), "[op %zu/%zu] change_yaw: yaw=%.3f rad frame=%s",
+          next_op_index_ + 1, plan_.operations.size(), op.yaw_rad, frame_to_cstr(op.frame));
+      response = api_.change_yaw(op.yaw_rad, op.frame);
+      break;
+
+    case MissionOperation::Type::WAYPOINT_FOLLOWING:
+      RCLCPP_INFO(node_.get_logger(), "[op %zu/%zu] waypoint_following: %zu waypoints frame=%s",
+          next_op_index_ + 1, plan_.operations.size(), op.waypoints.size(), frame_to_cstr(op.frame));
+      response = api_.waypoint_following(op.waypoints, op.frame);
+      break;
+
+    case MissionOperation::Type::LAND:
+      RCLCPP_INFO(node_.get_logger(), "[op %zu/%zu] land",
+          next_op_index_ + 1, plan_.operations.size());
+      response = api_.land();
+      break;
+  }
+
+  if (response != CommandResponse::ACCEPTED) {
+    std::ostringstream oss;
+    oss << "operation " << (next_op_index_ + 1) << " rejected";
+    abort_mission(oss.str());
+    return false;
+  }
+
+  ++next_op_index_;
+  step_ = Step::WAITING_OPERATION_COMPLETE;
+  return true;
 }
 
 void MissionExecutor::on_tick()
@@ -54,17 +122,19 @@ void MissionExecutor::on_tick()
 
     case Step::ARMING:
       if (status == OperationStatus::IDLE) {
-        timer_->cancel();
-        RCLCPP_INFO(node_.get_logger(), "Armed - taking off to %.1fm", plan_.takeoff_height);
-        if (api_.takeoff(plan_.takeoff_height) != CommandResponse::ACCEPTED) {
-          abort_mission("takeoff command rejected");
-        } else {
-          step_ = Step::WAITING_TAKEOFF;
-        }
+        RCLCPP_INFO(node_.get_logger(), "Armed - starting mission operations");
+        step_ = Step::WAITING_IDLE_TO_START_OP;
       }
       break;
 
-    default:
+    case Step::WAITING_IDLE_TO_START_OP:
+      if (status == OperationStatus::IDLE) {
+        start_next_operation();
+      }
+      break;
+
+    case Step::WAITING_OPERATION_COMPLETE:
+    case Step::DONE:
       break;
   }
 }
@@ -84,43 +154,21 @@ void MissionExecutor::on_operation_progress(const arch_nav::report::OperationRep
 
 void MissionExecutor::on_operation_complete(const arch_nav::report::OperationReport& report)
 {
+  if (step_ != Step::WAITING_OPERATION_COMPLETE) {
+    return;
+  }
+
   if (report.status() == ReportStatus::ABORTED) {
     abort_mission("operation aborted or vehicle lost control");
     return;
   }
 
-  switch (step_) {
-    case Step::WAITING_TAKEOFF:
-      RCLCPP_INFO(node_.get_logger(), "Takeoff complete - starting waypoint following");
-      if (api_.waypoint_following(plan_.waypoints) != CommandResponse::ACCEPTED) {
-        abort_mission("waypoint following command rejected");
-      } else {
-        step_ = Step::WAITING_WAYPOINTS;
-      }
-      break;
-
-    case Step::WAITING_WAYPOINTS:
-      if (plan_.land) {
-        RCLCPP_INFO(node_.get_logger(), "Waypoints complete - landing");
-        if (api_.land() != CommandResponse::ACCEPTED) {
-          abort_mission("land command rejected");
-        } else {
-          step_ = Step::WAITING_LAND;
-        }
-      } else {
-        RCLCPP_INFO(node_.get_logger(), "Mission complete");
-        step_ = Step::DONE;
-      }
-      break;
-
-    case Step::WAITING_LAND:
-      RCLCPP_INFO(node_.get_logger(), "Mission complete");
-      step_ = Step::DONE;
-      break;
-
-    default:
-      break;
+  if (report.status() == ReportStatus::FAILED) {
+    abort_mission("operation failed");
+    return;
   }
+
+  step_ = Step::WAITING_IDLE_TO_START_OP;
 }
 
 }  // namespace arch_nav_mission_file

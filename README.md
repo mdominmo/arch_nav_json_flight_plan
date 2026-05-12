@@ -4,22 +4,45 @@
 
 ROS 2 node that executes flight missions defined in JSON files using the [arch-nav](https://github.com/mdominmo/arch-nav) navigation kernel.
 
-This is an external module — the arch-nav kernel and a compatible driver must be installed on the system before building. See the [arch-nav build instructions](https://github.com/mdominmo/arch-nav#build-and-install).
+This is an external module - the arch-nav kernel and a compatible driver must be installed on the system before building. See the [arch-nav build instructions](https://github.com/mdominmo/arch-nav#build-and-install).
 
 ## Mission format
 
+The mission is an ordered list of operations. Only the operations present in the file are executed, in the exact order they appear.
+
 ```json
 {
-  "takeoff": {
-    "height": 10.0
-  },
-  "waypoints": [
-    { "latitude": 52.11495, "longitude": -6.61300, "altitude": 12.0 },
-    { "latitude": 52.11495, "longitude": -6.61285, "altitude": 12.0 }
-  ],
-  "land": true
+  "operations": [
+    {
+      "takeoff": {
+        "height": 10.0,
+        "frame": "LOCAL_NED"
+      }
+    },
+    {
+      "change_yaw": {
+        "yaw_rad": 3.141592653589793,
+        "frame": "BODY_FCS"
+      }
+    },
+    {
+      "waypoints": [
+        { "latitude": 52.11495, "longitude": -6.61300, "altitude": 12.0 },
+        { "latitude": 52.11495, "longitude": -6.61285, "altitude": 12.0 }
+      ]
+    },
+    {
+      "land": {}
+    }
+  ]
 }
 ```
+
+Supported operations:
+- `takeoff` with `height` and optional `frame` (`LOCAL_NED` by default).
+- `change_yaw` with `yaw_rad` and optional `frame` (`BODY_FCS` by default).
+- `waypoints` as an array, or as object `{ "frame", "items" }`.
+- `land`.
 
 ## Prerequisites
 
