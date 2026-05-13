@@ -1,0 +1,28 @@
+{
+  "operations": [
+    {
+      "takeoff": {
+        "height": 10.0,
+        "frame": "LOCAL_NED"
+      }
+    },
+    {
+      "set_roi": {
+        "latitude": 52.11490,
+        "longitude": -6.61292,
+        "altitude": 0.0
+      }
+    },
+    {
+      "waypoints": [
+        { "latitude": 52.11495, "longitude": -6.61300, "altitude": 12.0 },
+        { "latitude": 52.11495, "longitude": -6.61285, "altitude": 12.0 },
+        { "latitude": 52.11486, "longitude": -6.61285, "altitude": 12.0 },
+        { "latitude": 52.11486, "longitude": -6.61300, "altitude": 12.0 }
+      ]
+    },
+    {
+      "land": {}
+    }
+  ]
+}

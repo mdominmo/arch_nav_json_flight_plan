@@ -68,6 +68,18 @@ MissionOperation parse_land_op(const nlohmann::json&) {
   return op;
 }
 
+MissionOperation parse_set_roi_op(const nlohmann::json& payload) {
+  MissionOperation op;
+  op.type = MissionOperation::Type::SET_ROI;
+  op.roi_target = arch_nav::vehicle::GlobalPosition{
+      payload.at("latitude").get<double>(),
+      payload.at("longitude").get<double>(),
+      payload.at("altitude").get<double>()};
+  op.frame = parse_reference_frame(
+      payload.value("frame", std::string("GLOBAL_WGS84")));
+  return op;
+}
+
 }  // namespace
 
 MissionPlan MissionPlanLoader::load_from(const std::string& path)
@@ -108,6 +120,8 @@ MissionPlan MissionPlanLoader::load_from(const std::string& path)
       plan.operations.push_back(parse_waypoint_following_op(payload));
     } else if (op_name == "land") {
       plan.operations.push_back(parse_land_op(payload));
+    } else if (op_name == "set_roi") {
+      plan.operations.push_back(parse_set_roi_op(payload));
     } else {
       throw std::runtime_error(
           "Unsupported operation '" + op_name +
