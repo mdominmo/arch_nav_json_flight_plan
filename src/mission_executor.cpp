@@ -93,6 +93,15 @@ bool MissionExecutor::start_next_operation()
           next_op_index_ + 1, plan_.operations.size());
       response = api_.land();
       break;
+
+    case MissionOperation::Type::SET_ROI:
+      RCLCPP_INFO(node_.get_logger(),
+          "[op %zu/%zu] set_roi: lat=%.6f lon=%.6f alt=%.1f frame=%s",
+          next_op_index_ + 1, plan_.operations.size(),
+          op.roi_target.lat, op.roi_target.lon, op.roi_target.alt,
+          frame_to_cstr(op.frame));
+      response = api_.set_roi(op.roi_target, op.frame);
+      break;
   }
 
   if (response != CommandResponse::ACCEPTED) {
@@ -103,7 +112,13 @@ bool MissionExecutor::start_next_operation()
   }
 
   ++next_op_index_;
-  step_ = Step::WAITING_OPERATION_COMPLETE;
+  // set_roi is a command — no on_operation_complete callback will fire,
+  // so go back to WAITING_IDLE_TO_START_OP immediately.
+  if (op.type == MissionOperation::Type::SET_ROI) {
+    step_ = Step::WAITING_IDLE_TO_START_OP;
+  } else {
+    step_ = Step::WAITING_OPERATION_COMPLETE;
+  }
   return true;
 }
 
