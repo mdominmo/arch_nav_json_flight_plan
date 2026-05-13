@@ -9,7 +9,7 @@
     {
       "change_yaw": {
         "yaw_rad": 6.283185307179586,
-        "frame": "LOCAL_NED"
+        "frame": "BODY_FCS"
       }
     },
     {
@@ -23,7 +23,7 @@
     {
       "change_yaw": {
         "yaw_rad": 6.283185307179586,
-        "frame": "LOCAL_NED"
+        "frame": "BODY_FCS"
       }
     },
     {
