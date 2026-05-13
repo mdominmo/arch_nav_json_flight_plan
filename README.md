@@ -45,7 +45,24 @@ A mission is an ordered list of operations executed sequentially. The vehicle ar
 | `takeoff` | `height` (m) | `frame` | `LOCAL_NED` |
 | `change_yaw` | `yaw_rad` | `frame` | `BODY_FCS` |
 | `waypoints` | array of `{latitude, longitude, altitude}` | `frame` (object form) | `GLOBAL_WGS84` |
+| `set_roi` | `latitude`, `longitude`, `altitude` | `frame` | `GLOBAL_WGS84` |
 | `land` | — | — | — |
+
+### `set_roi`
+
+Points the vehicle nose toward a fixed geographic location for the duration of subsequent operations. It is a fire-and-forget command — the executor does not wait for a completion callback and proceeds to the next operation immediately after the driver accepts it.
+
+```json
+{
+  "set_roi": {
+    "latitude": 52.11490,
+    "longitude": -6.61292,
+    "altitude": 0.0
+  }
+}
+```
+
+`set_roi` is only accepted while the vehicle is **not** executing a navigation task (i.e. in `IDLE` or `DISARMED` state). Place it before a `waypoints` operation to make the vehicle yaw toward the target during the entire flight path. If the driver does not support the requested frame it returns `NOT_SUPPORTED` and the mission aborts.
 
 ### Waypoints: array vs object form
 
@@ -103,8 +120,11 @@ ros2 run arch_nav_json_flight_plan arch_nav_json_flight_plan \
 |-----------|----------|-------------|
 | `mission_file` | yes | Path to the JSON mission file |
 | `config` | no | Path to the arch-nav driver config file |
-| `driver` | no | Driver name override (e.g. `"mavsdk"`) |
+| `driver` | no | Driver name to load (e.g. `"mavsdk_px4"`, `"mavsdk_ardupilot"`) |
 
-## Example mission
+## Example missions
 
-A complete example is provided in [`missions/example.json`](missions/example.json). It takes off to 10 m, performs a full 360° rotation, follows a 4-waypoint square path, rotates again, and lands.
+| File | Description |
+|------|-------------|
+| [`missions/example.json`](missions/example.json) | Takeoff → 360° yaw → 4-waypoint square → 360° yaw → land |
+| [`missions/example_with_roi.json`](missions/example_with_roi.json) | Takeoff → set ROI → 4-waypoint square → land (vehicle nose tracks the ROI throughout) |
