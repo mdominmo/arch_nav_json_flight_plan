@@ -158,12 +158,12 @@ void MissionExecutor::on_operation_progress(const arch_nav::report::OperationRep
 {
   if (const auto* r = dynamic_cast<const arch_nav::report::TakeoffReport*>(&report)) {
     RCLCPP_INFO(node_.get_logger(), "[takeoff] altitude: %.1f / %.1f m",
-        r->driver_data().current_altitude.load(),
-        r->driver_data().target_altitude.load());
+        r->execution_state().current_altitude.load(),
+        r->execution_state().target_altitude.load());
   } else if (const auto* r = dynamic_cast<const arch_nav::report::WaypointReport*>(&report)) {
     RCLCPP_INFO(node_.get_logger(), "[waypoints] waypoint: %d / %d",
-        r->driver_data().current_waypoint.load(),
-        r->driver_data().total_waypoints.load());
+        r->execution_state().current_waypoint.load(),
+        r->execution_state().total_waypoints.load());
   }
 }
 
